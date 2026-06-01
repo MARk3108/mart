@@ -1,0 +1,65 @@
+networks:
+  bank-net:
+    external: true
+  mart-internal:
+    name: mart-internal
+    driver: bridge
+
+services:
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: mart-clickhouse
+    restart: unless-stopped
+    networks:
+      - mart-internal
+      - bank-net
+    ports:
+      - "8123:8123"
+      - "9001:9000"
+    environment:
+      CLICKHOUSE_USER: bank
+      CLICKHOUSE_PASSWORD: bank_pass
+      CLICKHOUSE_DB: bank_marts
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user bank --password bank_pass --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mart:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: mart
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - bank-net
+      - mart-internal
+    environment:
+      SOURCE_CLICKHOUSE_HOST: processor-clickhouse
+      SOURCE_CLICKHOUSE_PORT: "9000"
+      SOURCE_CLICKHOUSE_USER: bank
+      SOURCE_CLICKHOUSE_PASSWORD: bank_pass
+      SOURCE_CLICKHOUSE_DB: bank_raw
+      MART_CLICKHOUSE_HOST: clickhouse
+      MART_CLICKHOUSE_PORT: "9000"
+      MART_CLICKHOUSE_USER: bank
+      MART_CLICKHOUSE_PASSWORD: bank_pass
+      MART_CLICKHOUSE_DB: bank_marts
+      MART_SCHEDULE_MINUTES: "5"
+    volumes:
+      - ./src:/app
+
+volumes:
+  clickhouse-data:
