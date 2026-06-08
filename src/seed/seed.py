@@ -24,9 +24,8 @@ from config import config
 log = logging.getLogger(__name__)
 rng = random.Random(42)   # фиксированный seed для воспроизводимости
 
-# Даты: 7 дней до сегодня (15–21 мая 2026)
-TODAY = date(2026, 5, 22)
-SEED_DAYS = [TODAY - timedelta(days=i) for i in range(1, 8)]  # вчера и 6 дней назад
+TODAY = date.today()
+SEED_DAYS = [TODAY - timedelta(days=i) for i in range(1, 31)]
 
 
 def _source() -> Client:
