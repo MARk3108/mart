@@ -150,6 +150,56 @@ CREATE TABLE IF NOT EXISTS bank_marts.anomaly_alerts
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(detected_at)
 ORDER BY (detected_at, anomaly_type, entity_id);
+
+CREATE TABLE IF NOT EXISTS bank_marts.dim_businesses
+(
+    business_id   UUID,
+    company_name  String,
+    inn           String,
+    industry      String,
+    segment       String,
+    region        String,
+    tax_regime    String,
+    current_tariff String,
+    is_active     UInt8,
+    synced_at     DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(synced_at)
+ORDER BY business_id;
+
+CREATE TABLE IF NOT EXISTS bank_marts.dim_clients
+(
+    client_id         UUID,
+    full_name         String,
+    segment           String,
+    region            String,
+    primary_product   String,
+    subscription_plan String,
+    is_active         UInt8,
+    synced_at         DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(synced_at)
+ORDER BY client_id;
+
+CREATE TABLE IF NOT EXISTS bank_marts.dim_services
+(
+    service_id   UUID,
+    service_name String,
+    service_type String,
+    is_active    UInt8,
+    synced_at    DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(synced_at)
+ORDER BY service_id;
+
+CREATE TABLE IF NOT EXISTS bank_marts.dim_funnels
+(
+    funnel_id              UUID,
+    funnel_name            String,
+    service_id             UUID,
+    target_event           String,
+    benchmark_duration_sec UInt32,
+    is_active              UInt8,
+    synced_at              DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(synced_at)
+ORDER BY funnel_id;
 """
 
 
@@ -167,8 +217,16 @@ def ensure_schema(retries: int = 10, delay: int = 5) -> None:
             )
             for statement in DDL.strip().split(";"):
                 statement = statement.strip()
-                if statement:
+
+                if not statement:
+                    continue
+
+                try:
+                    log.info("Executing:\n%s", statement)
                     client.execute(statement)
+                except Exception as e:
+                    log.error("FAILED STATEMENT:\n%s\nERROR: %s", statement, e)
+                    raise
 
             log.info("ClickHouse schema (bank_marts) OK.")
             return

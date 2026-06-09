@@ -1,6 +1,8 @@
 networks:
   bank-net:
     external: true
+  processor-internal:
+    external: true
   mart-internal:
     name: mart-internal
     driver: bridge
@@ -46,6 +48,7 @@ services:
     networks:
       - bank-net
       - mart-internal
+      - processor-internal
     environment:
       SOURCE_CLICKHOUSE_HOST: processor-clickhouse
       SOURCE_CLICKHOUSE_PORT: "9000"
@@ -58,6 +61,7 @@ services:
       MART_CLICKHOUSE_PASSWORD: bank_pass
       MART_CLICKHOUSE_DB: bank_marts
       MART_SCHEDULE_MINUTES: "5"
+      POSTGRES_DSN: postgresql://bank:bank_pass@processor-postgres:5432/bank_registry
     volumes:
       - ./src:/app
 

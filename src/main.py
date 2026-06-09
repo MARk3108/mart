@@ -9,6 +9,7 @@ Mart Service — точка входа.
 import logging
 import signal
 import time
+from jobs import dims
 from datetime import datetime
 
 from config import config
@@ -27,7 +28,8 @@ logging.basicConfig(
 log = logging.getLogger("mart")
 
 _shutdown = False
-
+_last_dim_sync: float = 0.0
+DIM_SYNC_INTERVAL_SEC = 86400
 
 def _handle_signal(signum, frame):
     global _shutdown
@@ -36,8 +38,17 @@ def _handle_signal(signum, frame):
 
 
 def run_cycle() -> None:
+    global _last_dim_sync
+
     started = datetime.utcnow()
     log.info("=== Mart cycle started at %s ===", started.isoformat())
+
+    if (time.monotonic() - _last_dim_sync) >= DIM_SYNC_INTERVAL_SEC:
+        try:
+            dims.run()
+            _last_dim_sync = time.monotonic()
+        except Exception as e:
+            log.error("Job [dims] failed: %s", e, exc_info=True)
 
     # ── 1. Агрегация витрин ─────────────────────────────────────
     for job, name in [
@@ -113,6 +124,12 @@ def main() -> None:
     ensure_schema()
     run_seed()
     wait_for_clickhouse()
+
+    try:
+        dims.run()
+        _last_dim_sync = time.monotonic()
+    except Exception as e:
+        log.error("Job [dims] failed on startup: %s", e, exc_info=True)
 
     interval_sec = config.schedule_minutes * 60
 
