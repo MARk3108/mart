@@ -10,6 +10,8 @@ networks:
 services:
 
   clickhouse:
+    mem_limit: 8g
+    cpus: "2"
     image: clickhouse/clickhouse-server:24.3
     container_name: mart-clickhouse
     restart: unless-stopped
